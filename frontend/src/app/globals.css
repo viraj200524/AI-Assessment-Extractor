@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color: #172033; background: #f4f7fb; }
+* { box-sizing: border-box; }
+html { min-width: 320px; }
+body { margin: 0; min-height: 100vh; background: #f4f7fb; font-family: Arial, Helvetica, sans-serif; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+
+.app-shell { min-height: 100vh; }
+.hero-grid { background-image: radial-gradient(#d7e1f2 1px, transparent 1px); background-size: 22px 22px; }
+.panel-shadow { box-shadow: 0 16px 48px rgba(23, 42, 78, .10); }
+.dropzone { transition: border-color .2s, background .2s, transform .2s; }
+.dropzone:hover, .dropzone:focus-within { border-color: #2878f0; background: #f5f9ff; transform: translateY(-2px); }
+.page-card { position: relative; overflow: hidden; background: white; box-shadow: 0 5px 18px rgba(24, 39, 75, .16); }
+.answer-overlay { position: absolute; pointer-events: none; border: 3px solid #2878f0; border-radius: 6px; background: rgba(40, 120, 240, .16); box-shadow: 0 0 0 9999px rgba(40, 120, 240, .04); }
+.answer-overlay::after { content: "Selected answer"; position: absolute; top: -27px; left: -3px; padding: 4px 7px; border-radius: 5px 5px 5px 0; background: #2878f0; color: white; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.scrollbar-thin::-webkit-scrollbar { width: 8px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { border-radius: 8px; background: #cbd5e1; }

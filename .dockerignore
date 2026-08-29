@@ -1,0 +1,18 @@
+# Root build context for Dockerfile.vercel.
+# frontend/.dockerignore and backend/.dockerignore only apply when those directories are the
+# build context; a root-context build needs its own list.
+
+**/node_modules
+**/.next
+**/.git
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.venv
+**/venv
+.npm-cache
+
+# Never bake real credentials into an image.
+.env
+**/.env
+!.env.example

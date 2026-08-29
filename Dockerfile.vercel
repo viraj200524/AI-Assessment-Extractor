@@ -1,0 +1,59 @@
+# Production container for the Next.js 15 teacher workspace.
+#
+# Builds the frontend and then RUNS it. The previous version compiled the frontend in a
+# builder stage, discarded it, and started uvicorn instead - duplicating backend/Dockerfile
+# while shipping no frontend at all.
+#
+# The FastAPI service has its own image at backend/Dockerfile; the two deploy independently
+# (frontend here or on Vercel's native build, backend on Render/Railway/any container host).
+#
+# Build:  docker build -f Dockerfile.vercel --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.example.com/api/v1 -t vedai-frontend .
+# Run:    docker run -p 3000:3000 vedai-frontend
+
+# ---------- deps ----------
+FROM node:20-alpine AS deps
+WORKDIR /app
+# The repo carries both package-lock.json and pnpm-lock.yaml; npm is preferred here so the
+# image needs no corepack/pnpm bootstrap (the pnpm release corepack resolves requires a
+# newer Node than this base image).
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+# ---------- build ----------
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY frontend/ .
+
+# NEXT_PUBLIC_* values are inlined into the client bundle at build time, so the API URL has
+# to be supplied here rather than at run time.
+ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Opt into the standalone bundle for this build only (see frontend/next.config.ts).
+ENV NEXT_OUTPUT_STANDALONE=1
+
+RUN npm run build
+
+# ---------- runner ----------
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
+
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 nextjs
+
+# `output: "standalone"` emits a self-contained server with only the modules it needs.
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
+EXPOSE 3000
+
+CMD ["node", "server.js"]
