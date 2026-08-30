@@ -47,7 +47,7 @@ export interface JobStage {
 
 export type JobState = "queued" | "running" | "succeeded" | "failed";
 
-/** Live snapshot of a server-side parsing job, used to drive the progress UI (FR-02). */
+/** Current snapshot of a parsing job returned by status or event stream. */
 export interface JobStatus {
   job_id: string;
   state: JobState;

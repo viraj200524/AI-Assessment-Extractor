@@ -105,10 +105,7 @@ class SupabaseService:
             }
             self.client.table("assessments").upsert(assessment_data).execute()
 
-            # 2. Insert question records.
-            # order_index preserves the printed sequence (FR-03). created_at cannot: every
-            # row in this batch shares one transaction timestamp, so ordering by it is an
-            # unspecified tiebreak that an upsert-update can silently reshuffle.
+            # 2. Insert question records
             question_rows = []
             for order_index, q in enumerate(questions):
                 question_rows.append(
@@ -121,8 +118,6 @@ class SupabaseService:
                         "max_marks": round(q.max_marks, 2),
                         "obtained_score": round(q.evaluation.score, 2),
                         "status": q.status,
-                        # Stored, not re-derived: score >= max_marks cannot express an answer
-                        # the examiner judged substantially correct on partial credit.
                         "is_correct": q.evaluation.is_correct,
                         "transcribed_answer": q.transcribed_answer,
                         "feedback": q.evaluation.feedback,
@@ -133,7 +128,7 @@ class SupabaseService:
             if question_rows:
                 self.client.table("questions").upsert(question_rows, on_conflict="assessment_id, question_key").execute()
 
-            # 3. Insert unmatched student writing (FR-09).
+            # 3. Insert unmatched student writing
             unmatched_rows = []
             for order_index, unmatched in enumerate(unmatched_answers or []):
                 unmatched_rows.append(
@@ -167,16 +162,12 @@ class SupabaseService:
         if not self.is_available:
             raise SupabaseServiceError("Supabase is not configured.")
 
-        # A syntactically invalid id cannot name a row; treat it as missing rather than
-        # letting PostgREST raise 22P02 and surface as a 500.
         try:
             UUID(assessment_id)
         except (ValueError, AttributeError, TypeError):
             raise AssessmentNotFoundError(f"Assessment {assessment_id} not found.") from None
 
         try:
-            # limit(1) rather than single(): single() raises PGRST116 on zero rows, which
-            # made the not-found branch below unreachable and returned 500 instead of 404.
             assessment_res = (
                 self.client.table("assessments").select("*").eq("id", assessment_id).limit(1).execute()
             )
@@ -240,7 +231,7 @@ class SupabaseService:
                     }
                 )
 
-            # Reconstruct UnmatchedAnswer structures (FR-09)
+            # Reconstruct UnmatchedAnswer structures
             unmatched_list = []
             for row in unmatched_res.data or []:
                 unmatched_list.append(
@@ -284,11 +275,7 @@ class SupabaseService:
             return []
 
     def delete_assessment(self, assessment_id: str) -> bool:
-        """Delete an assessment record (cascading to questions).
-
-        Raises AssessmentNotFoundError when nothing matched, so the API can answer 404
-        instead of reporting success for an id that never existed.
-        """
+        """Delete an assessment record and its associated questions."""
         if not self.is_available:
             raise SupabaseServiceError("Supabase is not configured.")
 

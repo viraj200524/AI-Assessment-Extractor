@@ -1,4 +1,4 @@
-"""Job-based parsing with live stage reporting (FR-02) and non-blocking execution."""
+"""Tests for background parsing job execution and status reporting."""
 
 import json
 import time
@@ -23,7 +23,7 @@ FILES = {
 
 
 class StubGemini:
-    """Deterministic stand-in for the two Gemini calls."""
+    """Mock implementation of Gemini extraction and mapping service for tests."""
 
     def __init__(self, *_: object, **__: object) -> None:
         pass
@@ -101,7 +101,6 @@ def test_job_accepts_immediately_and_reports_declared_stages(stubbed_pipeline: N
         body = response.json()
         assert body["state"] in ("queued", "running")
         assert body["job_id"]
-        # FR-02 names these stages explicitly; the client renders them from this list.
         labels = [stage["label"] for stage in body["stages"]]
         assert "Rasterizing pages" in labels
         assert "Parsing questions" in labels
@@ -173,7 +172,7 @@ def test_job_rejects_unsupported_document_type() -> None:
 
 
 def test_failed_job_surfaces_its_specific_status_code(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A quota failure must reach the client as 429, not a generic 502."""
+    """Verify that upstream API errors are propagated with appropriate HTTP status codes."""
     from app.services.gemini_service import GeminiQuotaError
 
     class QuotaGemini(StubGemini):
@@ -198,7 +197,7 @@ def test_failed_job_surfaces_its_specific_status_code(monkeypatch: pytest.Monkey
 
 
 def test_synchronous_parse_does_not_block_the_event_loop(stubbed_pipeline: None, monkeypatch: pytest.MonkeyPatch) -> None:
-    """/parse must offload its blocking work, or one upload freezes the whole worker."""
+    """Ensure synchronous parse operations execute in a thread pool without blocking event loop."""
     import threading
 
     started = threading.Event()

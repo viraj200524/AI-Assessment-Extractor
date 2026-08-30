@@ -19,7 +19,7 @@ create table if not exists public.questions (
     id uuid primary key default gen_random_uuid(),
     assessment_id uuid not null references public.assessments(id) on delete cascade,
     question_key varchar(50) not null,
-    order_index integer not null default 0, -- printed sequence (FR-03); created_at is not a usable tiebreak
+    order_index integer not null default 0,
     full_label varchar(50) not null,
     question_text text not null,
     max_marks numeric(5, 2) not null default 0.00 check (max_marks >= 0),
@@ -36,7 +36,7 @@ create table if not exists public.questions (
 create index if not exists idx_questions_assessment_id on public.questions(assessment_id);
 create index if not exists idx_questions_assessment_order on public.questions(assessment_id, order_index);
 
--- Extra or mislabelled student writing that maps to no question (FR-09).
+-- Unmatched or extraneous student handwriting
 create table if not exists public.unmatched_answers (
     id uuid primary key default gen_random_uuid(),
     assessment_id uuid not null references public.assessments(id) on delete cascade,

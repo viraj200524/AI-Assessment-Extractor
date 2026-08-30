@@ -58,12 +58,7 @@ def test_two_stage_pipeline_validates_and_normalizes_missing_questions(tmp_path:
 
 
 def test_model_bounding_boxes_are_passed_through_unmodified(tmp_path: Path) -> None:
-    """The model's spatial output is the answer (FR-10), not a starting point.
-
-    A post-processing pass used to widen every box to xmin<=100 / xmax>=920 and extend ymax
-    by an estimated line count. Measured against real pages that inflated a two-character
-    MCQ answer from ~60 to 820 units wide, so the model's own extents now stand as-is.
-    """
+    """Verify that tight bounding box coordinates from the model are preserved without inflation."""
     image = tmp_path / "page.jpg"
     image.write_bytes(b"test image bytes")
 

@@ -1,8 +1,4 @@
-"""Shared-key gating and rate limiting on the endpoints that cost quota or destroy data.
-
-Reads stay open by design: a reviewer must be able to explore the deployed demo without a
-signup wall. Only mutating endpoints are gated.
-"""
+"""Tests for shared access key gating and IP-based rate limiting."""
 
 from types import SimpleNamespace
 
@@ -43,9 +39,7 @@ def _use_settings(**overrides) -> None:
     app.dependency_overrides[get_settings] = lambda: Settings(**base)
 
 
-# --------------------------------------------------------------------------------------
-# Unconfigured: everything stays open (local development and CI)
-# --------------------------------------------------------------------------------------
+# Unconfigured mode (open writes)
 
 def test_writes_are_open_when_no_key_is_configured(stubbed_pipeline: None) -> None:
     with TestClient(app) as client:
@@ -53,9 +47,7 @@ def test_writes_are_open_when_no_key_is_configured(stubbed_pipeline: None) -> No
         assert client.post("/api/v1/parse/jobs", files=FILES).status_code == 202
 
 
-# --------------------------------------------------------------------------------------
-# Configured: reads open, writes gated
-# --------------------------------------------------------------------------------------
+# Configured mode (writes gated with key)
 
 def test_health_advertises_that_a_key_is_required() -> None:
     _use_settings(demo_access_key=DEMO_KEY)
@@ -64,7 +56,7 @@ def test_health_advertises_that_a_key_is_required() -> None:
 
 
 def test_reads_remain_public_when_a_key_is_configured() -> None:
-    """A reviewer must be able to browse the demo without any credential."""
+    """Verify that read endpoints remain accessible without an access key."""
     _use_settings(demo_access_key=DEMO_KEY)
     with TestClient(app) as client:
         assert client.get("/api/v1/health").status_code == 200

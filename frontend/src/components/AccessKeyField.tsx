@@ -5,8 +5,7 @@ import { CheckCircle2, KeyRound, X } from "lucide-react";
 import { useAccessKey } from "@/hooks/useAccessKey";
 
 /**
- * Compact access-key control. Renders nothing unless this deployment actually gates writes,
- * so local development and an unprotected deployment show no extra chrome.
+ * Access key input component for configuring authentication when required.
  */
 export function AccessKeyField({ className = "" }: { className?: string }) {
   const { required, resolved, hasKey, setKey, clear } = useAccessKey();
@@ -58,7 +57,7 @@ export function AccessKeyField({ className = "" }: { className?: string }) {
         type="password"
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
-        placeholder="Paste the key from the submission"
+        placeholder="Enter access key"
         autoComplete="off"
         className="min-w-[220px] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
       />

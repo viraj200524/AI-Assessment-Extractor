@@ -1,10 +1,5 @@
 /**
- * Shared demo access key, held only in the viewer's browser.
- *
- * Deliberately NOT a NEXT_PUBLIC_ env var: those are inlined into the client bundle at
- * build time, so the key would ship in plain JavaScript to every visitor and protect
- * nothing. It is supplied per-viewer instead - via the `?key=` link or the in-app field -
- * and kept in localStorage.
+ * Utilities for storing and retrieving the optional demo access key in the browser.
  */
 
 const STORAGE_KEY = "vedai.accessKey";
@@ -15,7 +10,6 @@ function storage(): Storage | null {
   try {
     return window.localStorage;
   } catch {
-    // Private mode or blocked site data.
     return null;
   }
 }
@@ -34,7 +28,7 @@ export function saveAccessKey(key: string): void {
     if (trimmed) storage()?.setItem(STORAGE_KEY, trimmed);
     else storage()?.removeItem(STORAGE_KEY);
   } catch {
-    /* nothing we can do; the request will just be rejected */
+    // Ignore storage write errors (e.g. private browsing storage limits)
   }
 }
 
@@ -42,18 +36,12 @@ export function clearAccessKey(): void {
   try {
     storage()?.removeItem(STORAGE_KEY);
   } catch {
-    /* ignore */
+    // Ignore storage deletion errors
   }
 }
 
 /**
- * Adopt a key passed as `?key=...`, then strip it from the URL.
- *
- * This is what makes a single submitted link work with no setup. The trade-off is that a
- * URL-borne key is visible in browser history and referrer headers, which is acceptable for
- * a rotatable demo key and would not be for a real credential.
- *
- * Returns true when a key was adopted from the URL.
+ * Check for an access key in URL search parameters, store it, and clean the URL.
  */
 export function bootstrapAccessKeyFromUrl(): boolean {
   if (typeof window === "undefined") return false;
@@ -68,7 +56,9 @@ export function bootstrapAccessKeyFromUrl(): boolean {
   return true;
 }
 
-/** Headers for a mutating request. Empty when no key is held. */
+/**
+ * Return authorization headers for mutating requests if a key is stored.
+ */
 export function accessKeyHeaders(): Record<string, string> {
   const key = readAccessKey();
   return key ? { "X-Demo-Key": key } : {};

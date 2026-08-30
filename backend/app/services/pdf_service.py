@@ -23,11 +23,7 @@ def rasterize_document(
     dpi: int = 150,
     progress: Callable[[int, int], None] | None = None,
 ) -> list[RasterizedPage]:
-    """Render a PDF, PNG, or JPEG into ordered, consistently encoded JPEG pages.
-
-    ``progress`` is invoked as ``progress(page_number, total_pages)`` after each page is
-    written, so callers can report rasterization progress to a client.
-    """
+    """Render a PDF, PNG, or JPEG file into standardized JPEG page images."""
     if dpi <= 0:
         raise ValueError("dpi must be greater than zero")
 

@@ -1,4 +1,4 @@
-"""Run a live end-to-end Phase 4 smoke test with Gemini Vision and Supabase persistence."""
+"""Run an end-to-end smoke test for document parsing and Supabase persistence."""
 
 from pathlib import Path
 import sys
@@ -22,7 +22,7 @@ def create_pdf(path: Path, text: str) -> None:
 
 
 def main() -> int:
-    with TemporaryDirectory(prefix="vedai-phase4-") as temporary_directory:
+    with TemporaryDirectory(prefix="vedai-smoke-") as temporary_directory:
         workspace = Path(temporary_directory)
         qp_file = workspace / "Physics_Test.pdf"
         ans_file = workspace / "Student_Response.pdf"
@@ -41,7 +41,7 @@ def main() -> int:
             )
 
         if response.status_code != 200:
-            print(f"Phase 4 parse failed with HTTP {response.status_code}: {response.text}")
+            print(f"Parse failed with HTTP {response.status_code}: {response.text}")
             return 1
 
         payload = response.json()
@@ -62,7 +62,7 @@ def main() -> int:
         else:
             print("Supabase is not configured; skipped direct DB fetch.")
 
-    print("\nPhase 4 Live End-to-End Smoke Test Passed Successfully!")
+    print("\nEnd-to-End Smoke Test Passed Successfully!")
     return 0
 
 

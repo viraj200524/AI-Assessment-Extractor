@@ -1,4 +1,4 @@
-"""Edge-case tests covering the complete functional requirements matrix (FR-03 to FR-13)."""
+"""Edge-case tests covering question parsing, answer mapping, and score validation."""
 
 import pytest
 from pydantic import ValidationError
@@ -9,7 +9,7 @@ from app.schemas.question import AnswerRegion, BoundingBox, Evaluation, Question
 
 
 def test_subparts_extracted_as_discrete_questions() -> None:
-    """FR-03 & FR-04: Labelled sub-parts like 11(a) and 11(b) must be separate questions."""
+    """Labelled sub-parts such as 11(a) and 11(b) should be parsed as separate questions."""
     q_paper = QuestionPaperExtraction(
         questions=[
             ExtractedQuestion(
@@ -38,7 +38,7 @@ def test_subparts_extracted_as_discrete_questions() -> None:
 
 
 def test_unanswered_question_enforces_zero_score_and_no_regions() -> None:
-    """FR-08: Unanswered question must have 0 marks and no spatial bounding boxes."""
+    """Unanswered questions must have zero score and empty answer regions."""
     q = QuestionItem(
         id="q11_b",
         number="11",
@@ -71,7 +71,7 @@ def test_unanswered_question_enforces_zero_score_and_no_regions() -> None:
 
 
 def test_out_of_order_answer_mapping_and_multi_page_regions() -> None:
-    """FR-07, FR-10, FR-11: Out-of-order responses and multi-page answer spans."""
+    """Answers written out of sequence or spanning multiple pages should be correctly grounded."""
     q = QuestionItem(
         id="q3",
         number="3",
@@ -93,7 +93,7 @@ def test_out_of_order_answer_mapping_and_multi_page_regions() -> None:
 
 
 def test_unmatched_student_writing_isolation() -> None:
-    """FR-09: Unmatched or extraneous handwriting is isolated with bounding box and reason."""
+    """Unmatched or extraneous handwriting should be captured with bounding boxes and explanatory reason."""
     unmatched = UnmatchedAnswer(
         id="unmatched_1",
         page_number=2,
@@ -106,7 +106,7 @@ def test_unmatched_student_writing_isolation() -> None:
 
 
 def test_assessment_response_score_and_percentage_mathematical_consistency() -> None:
-    """FR-12 & FR-13: Assessment response validates sum of scores and exact percentage."""
+    """Assessment responses must maintain exact consistency between question scores and total percentage."""
     q1 = QuestionItem(
         id="q1",
         number="1",

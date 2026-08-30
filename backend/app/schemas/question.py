@@ -5,12 +5,12 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class BoundingBox(BaseModel):
-    """A non-empty Gemini normalized [0, 1000] spatial region covering the full answer block."""
+    """Normalized [0, 1000] 2D bounding box representing an answer region."""
 
-    ymin: int = Field(ge=0, le=1000, description="Topmost Y coordinate (0-1000) at or slightly above the start of the answer / question number")
-    xmin: int = Field(ge=0, le=1000, description="Leftmost X coordinate (0-1000) to the left of the question number and text")
-    ymax: int = Field(ge=0, le=1000, description="Bottommost Y coordinate (0-1000) covering completely below the last line of the entire answer")
-    xmax: int = Field(ge=0, le=1000, description="Rightmost X coordinate (0-1000) to the right of the longest line of the answer")
+    ymin: int = Field(ge=0, le=1000, description="Top Y coordinate (0-1000)")
+    xmin: int = Field(ge=0, le=1000, description="Left X coordinate (0-1000)")
+    ymax: int = Field(ge=0, le=1000, description="Bottom Y coordinate (0-1000)")
+    xmax: int = Field(ge=0, le=1000, description="Right X coordinate (0-1000)")
 
     @model_validator(mode="after")
     def validate_edges(self) -> "BoundingBox":

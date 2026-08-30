@@ -6,10 +6,7 @@ import { createParseJob, getParseJobResult, watchParseJob } from "@/lib/api";
 import { useAssessmentStore } from "@/store/useAssessmentStore";
 import type { JobStage } from "@/types";
 
-/**
- * Fallback stage list rendered before the server's first status frame arrives.
- * The server is authoritative: every status update carries its own `stages` array.
- */
+/** Default stages used before live server updates arrive */
 export const DEFAULT_STAGES: JobStage[] = [
   { key: "uploading", label: "Uploading documents" },
   { key: "rasterizing", label: "Rasterizing pages" },
@@ -55,7 +52,6 @@ export function useAssessment() {
       setCurrentStage(job.stage_index);
       setProgress(job.progress);
 
-      // Every update below reflects real server-side pipeline state, not a timer.
       await watchParseJob(
         job.job_id,
         (status) => {

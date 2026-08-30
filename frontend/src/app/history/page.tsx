@@ -39,7 +39,6 @@ export default function HistoryPage() {
       await deleteAssessmentById(id);
       setAssessments((prev) => prev.filter((item) => item.id !== id));
     } catch (error) {
-      // Surfaces the server's reason - most often a missing or wrong access key.
       setDeleteError(error instanceof Error ? error.message : "The assessment could not be deleted.");
     } finally {
       setDeletingId(null);

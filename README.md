@@ -1,89 +1,81 @@
 # VedaAI Assessment Extractor & Answer Mapping
 
-Phase 1 establishes the monorepo layout, a runnable FastAPI service, validated backend data contracts, an environment blueprint, and a Supabase migration with private upload buckets. Document processing, Gemini calls, persistence endpoints, and the interactive UI belong to later phases.
+An automated assessment extraction and evaluation system. It takes printed exam question papers alongside handwritten student answer sheets, parses and extracts questions, spatially grounds and maps each handwritten answer block to its corresponding question, evaluates student answers with constructive feedback and marks, and renders an interactive side-by-side review workspace.
 
-Phase 2 adds a `POST /api/v1/parse` multipart endpoint. It rasterizes PDF, PNG, and JPEG input to 150-DPI JPEG pages, extracts ordered questions with Gemini, then transcribes and spatially maps every student answer. Results are returned only for review in this phase; Supabase persistence and automated scoring are intentionally deferred.
+## Project Structure
 
-Phase 3 adds the Next.js teacher workspace in `frontend/`: upload/progress UI, status filters, question navigation, client-side PDF/image rendering, auto-scroll, and responsive normalized answer overlays. The review session is browser-local until Phase 4 persistence is added.
+- `backend/`: FastAPI application handling PDF/image rasterization, Google Gemini Vision integration, background job execution, and Supabase persistence.
+- `frontend/`: Next.js workspace with client-side document viewing, bounding-box overlays, live stage progress tracking, and score breakdown.
+- `supabase/`: Database schemas, storage bucket policies, and SQL migrations.
 
-## Layout
+## Getting Started
 
-- `backend/`: FastAPI service and contract tests.
-- `frontend/`: reserved Next.js workspace for Phase 3.
-- `supabase/`: database and storage migration.
+### 1. Backend Setup
 
-## Run locally
-
-From `backend/`, install dependencies into the supplied workspace virtual environment and start the API:
+From the repository root, install backend dependencies and start the API server:
 
 ```powershell
-..\..\viraj\Scripts\python.exe -m pip install -r requirements.txt
-..\..\viraj\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
+..\viraj\Scripts\python.exe -m pip install -r backend/requirements.txt
+..\viraj\Scripts\python.exe -m uvicorn app.main:app --app-dir backend --reload --port 8000
 ```
 
-`http://localhost:8000/api/v1/health` works without third-party credentials. It reports both integrations as unconfigured until their variables are set.
+The health check endpoint at `http://localhost:8000/api/v1/health` verifies API status and reports whether third-party integrations (Gemini and Supabase) are configured.
 
-## Configure Supabase
+### 2. Frontend Setup
 
-1. Copy `.env.example` to `.env` and set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. The service-role key is backend-only and must never be exposed to the browser.
-2. Apply everything in `supabase/migrations/` using the Supabase CLI or SQL editor. Together they create `assessments`, `questions`, `unmatched_answers`, their indexes, and the private `question-papers` / `answer-sheets` buckets.
-
-To run the migrations from this repository, add the PostgreSQL connection URI from **Supabase Dashboard → Connect** as `SUPABASE_DB_URL` in `.env`, then run (it applies every migration in filename order and is safe to re-run):
+From `frontend/`:
 
 ```powershell
-..\viraj\Scripts\python.exe backend\scripts\apply_migration.py
+npm install
+npm run dev
 ```
 
-## Parsing API
+The frontend will run at `http://localhost:3000`.
 
-Two ways to run the pipeline. The UI uses the job flow.
+### 3. Environment & Supabase Configuration
 
-| Endpoint | Purpose |
-| :--- | :--- |
-| `POST /api/v1/parse/jobs` | Upload both documents, start the pipeline in the background, get a `job_id` back immediately (202). |
-| `GET /api/v1/parse/jobs/{id}/events` | Server-Sent Events stream of stage transitions. Drives the progress UI (FR-02). |
-| `GET /api/v1/parse/jobs/{id}` | Poll the same status. Used automatically when SSE cannot be established. |
-| `GET /api/v1/parse/jobs/{id}/result` | Collect the finished `AssessmentResponse`. 409 while still running, or the job's own failure status. |
-| `POST /api/v1/parse` | One-shot synchronous parse. No progress signal, and can exceed platform request timeouts on longer documents. |
+1. Copy `.env.example` to `.env` and set your credentials:
+   - `GEMINI_API_KEY`: API key from Google AI Studio.
+   - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`: Supabase project credentials.
+2. Apply database migrations in `supabase/migrations/` using the Supabase CLI or SQL editor. To run them directly using the backend helper, set `SUPABASE_DB_URL` in `.env` and execute:
 
-Stages reported, in order: `uploading`, `rasterizing`, `parsing_questions`, `grounding_answers`, `persisting`.
-Each status frame also carries a `detail` string (for example `Answer sheet page 3 of 4`) and a `progress`
-fraction, so the client never has to guess where the pipeline is.
+```powershell
+..\viraj\Scripts\python.exe backend/scripts/apply_migration.py
+```
 
-Failures carry the status they deserve rather than a single generic 502: `429` for an exhausted Gemini
-quota, `504` on timeout, `503` when Gemini is unreachable, `422` for a page Gemini cannot read, `500`
-for a rejected or missing API key, and `502` only for a genuinely unusable response.
+## Parsing Pipeline
 
-**Job state is per-process.** It lives in memory in the worker that accepted the upload, which suits a
-single uvicorn worker. Running multiple workers or replicas requires moving `JobStore` to Redis or
-Postgres, or a poll can land on a worker that never saw the job.
+The backend supports both background job-based parsing (recommended for UI workflows) and direct synchronous parsing:
 
-## Security scope
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/v1/parse/jobs` | `POST` | Upload question paper and answer sheet; returns a `job_id` immediately (202 Accepted). |
+| `/api/v1/parse/jobs/{id}/events` | `GET` | Server-Sent Events (SSE) stream broadcasting live progress and stage transitions. |
+| `/api/v1/parse/jobs/{id}` | `GET` | Polling endpoint for job status (used when SSE is not supported). |
+| `/api/v1/parse/jobs/{id}/result` | `GET` | Retrieve completed assessment payload (returns 409 while processing). |
+| `/api/v1/parse` | `POST` | Synchronous one-shot parse endpoint. |
 
-This is a demo deployment, and its access control is scoped to match.
+### Pipeline Stages
 
-- **Reads are public.** Listing assessments and opening one needs no credential, so the app
-  can be explored without a signup wall.
-- **Writes require a shared key.** `POST /parse`, `POST /parse/jobs`, and
-  `DELETE /assessments/{id}` require the `X-Demo-Key` header to match `DEMO_ACCESS_KEY`.
-  Those are the operations that spend Gemini free-tier quota or destroy data.
-- **Rate limiting is independent of the key.** `PARSE_RATE_LIMIT_PER_HOUR` caps parses per
-  client IP, so the quota is protected even if the key is shared onwards.
-- **The key is never in the client bundle.** `NEXT_PUBLIC_*` values are inlined at build
-  time and would be readable by every visitor. The key is supplied per viewer instead —
-  through `?key=…` on first load, or the in-app field — and kept in that browser's
-  `localStorage`. A key in a URL is visible in history and referrer headers, which is an
-  acceptable trade for a rotatable demo key and would not be for a real credential.
+During processing, the following stages are reported:
+1. `uploading`: Document ingestion and staging.
+2. `rasterizing`: Rendering PDF/image pages to standardized high-resolution images.
+3. `parsing_questions`: Extracting structured questions, labels, subparts, and maximum marks.
+4. `grounding_answers`: Transcribing handwritten answers, locating 2D bounding boxes on pages, and scoring.
+5. `persisting`: Uploading source documents to storage and saving assessment records in PostgreSQL.
 
-This gates cost and destruction, not identity. Real multi-tenancy would mean per-user
-ownership on every row and Supabase RLS policies, which is a different product than the one
-this repository describes; the `service_role` key stays strictly server-side either way.
+## Access Control & Rate Limiting
 
-With `DEMO_ACCESS_KEY` unset — the default, and how the test suite runs — every endpoint is
-open and nothing is throttled.
+- **Read Operations**: Public endpoints for listing and viewing past assessments.
+- **Write Operations**: When `DEMO_ACCESS_KEY` is configured in `.env`, mutating endpoints (`POST /parse`, `POST /parse/jobs`, `DELETE /assessments/{id}`) require the `X-Demo-Key` header.
+- **Rate Limiting**: `PARSE_RATE_LIMIT_PER_HOUR` enforces per-IP sliding-window limits on parsing requests.
+- **Client Key Handling**: Keys entered in the UI or passed via `?key=...` query parameters are stored in the browser's `localStorage` and never bundled at build time.
 
-## Test contracts
+## Running Tests
+
+Run the backend test suite:
 
 ```powershell
 ..\viraj\Scripts\python.exe -m pytest backend/tests
 ```
+

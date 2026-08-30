@@ -39,9 +39,7 @@ class MappedAnswer(BaseModel):
     def unanswered_has_no_grounding(self) -> "MappedAnswer":
         if self.status == "unanswered" and (self.transcribed_answer or self.answer_regions):
             raise ValueError("Unanswered mappings cannot contain text or answer regions.")
-        # An answered question with no usable region is degraded, not invalid: the answer and
-        # its grade are still worth keeping even when the highlight cannot be drawn. The repair
-        # layer in gemini_service logs these; failing here would discard the whole extraction.
+        # Note: Answered questions may have empty regions if spatial localization was unavailable
         return self
 
 

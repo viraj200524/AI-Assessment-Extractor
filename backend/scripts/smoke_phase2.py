@@ -1,4 +1,4 @@
-"""Run a real Gemini smoke check using synthetic documents."""
+"""Smoke check for Gemini question extraction and answer mapping."""
 
 from pathlib import Path
 import sys
@@ -37,7 +37,7 @@ def main() -> int:
                 },
             )
     if response.status_code != 200:
-        print(f"Phase 2 smoke check failed: HTTP {response.status_code}")
+        print(f"Extraction smoke check failed: HTTP {response.status_code}")
         print(response.json().get("detail", "No error detail returned."))
         return 1
 
@@ -46,7 +46,7 @@ def main() -> int:
     first_q = payload["questions"][0] if payload["questions"] else None
     eval_info = f"score={first_q['evaluation']['score']}/{first_q['max_marks']}, feedback='{first_q['evaluation']['feedback']}'" if first_q else "no questions"
     print(
-        "Phase 2 smoke check passed: "
+        "Extraction smoke check passed: "
         f"questions={len(payload['questions'])}, statuses={statuses}, "
         f"total={payload['total_score']}/{payload['max_possible_score']} ({payload['percentage']}%), "
         f"{eval_info}, unmatched={len(payload['unmatched_answers'])}"

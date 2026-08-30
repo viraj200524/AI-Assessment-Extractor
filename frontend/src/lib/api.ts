@@ -11,8 +11,7 @@ function documentFormData(questionPaper: File, answerSheet: File): FormData {
 }
 
 /**
- * One-shot parse. Kept for parity with the backend, but it reports no progress and can
- * exceed platform request timeouts on longer documents — the UI uses the job flow below.
+ * Synchronous assessment parsing request.
  */
 export async function parseAssessment(questionPaper: File, answerSheet: File): Promise<AssessmentData> {
   const response = await fetch(`${apiBaseUrl}/parse`, {
@@ -27,7 +26,9 @@ export async function parseAssessment(questionPaper: File, answerSheet: File): P
   return body as AssessmentData;
 }
 
-/** Upload both documents and start the pipeline in the background. */
+/**
+ * Submit question paper and answer sheet for background processing.
+ */
 export async function createParseJob(questionPaper: File, answerSheet: File): Promise<JobStatus> {
   const response = await fetch(`${apiBaseUrl}/parse/jobs`, {
     method: "POST",
@@ -42,11 +43,7 @@ export async function createParseJob(questionPaper: File, answerSheet: File): Pr
 }
 
 /**
- * Follow a job to completion, invoking `onStatus` on every stage transition.
- *
- * Prefers Server-Sent Events and falls back to polling if the stream cannot be opened
- * (some corporate proxies and older Safari builds buffer or drop text/event-stream).
- * Resolves with the terminal status; rejects with the server's specific error message.
+ * Track a parsing job's progress via Server-Sent Events, falling back to polling if needed.
  */
 export function watchParseJob(
   jobId: string,
@@ -130,8 +127,6 @@ export function watchParseJob(
         }
       });
       source.addEventListener("expired", () => fail(new Error("This processing job expired.")));
-      // Also fires when the server closes the stream after a terminal event; the `settled`
-      // guard means that path is already resolved and this becomes a no-op.
       source.onerror = () => {
         if (!settled) startPolling();
       };
@@ -141,7 +136,7 @@ export function watchParseJob(
   });
 }
 
-/** Collect the finished assessment once its job has succeeded. */
+/** Retrieve assessment results once job processing completes. */
 export async function getParseJobResult(jobId: string): Promise<AssessmentData> {
   const response = await fetch(`${apiBaseUrl}/parse/jobs/${jobId}/result`);
   const body = await response.json().catch(() => null);
@@ -156,7 +151,6 @@ export interface HealthStatus {
   environment: string;
   supabase_configured: boolean;
   gemini_configured: boolean;
-  /** True when this deployment gates writes behind a shared key. */
   access_key_required: boolean;
 }
 

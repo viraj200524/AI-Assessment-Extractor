@@ -1,10 +1,4 @@
-"""Per-IP sliding-window rate limiting for the endpoints that cost Gemini quota.
-
-Independent of the access key on purpose: it still protects the free-tier budget if the
-shared key leaks, and it stops an impatient double-click from queuing duplicate 90-second
-jobs. Like the job store, the counters are per-process - correct for a single uvicorn
-worker, and something to move to Redis if this is ever scaled out.
-"""
+"""In-memory sliding-window rate limiting for parsing endpoints."""
 
 import threading
 import time
@@ -21,7 +15,7 @@ class SlidingWindowRateLimiter:
         self._lock = threading.Lock()
 
     def check(self, key: str, limit: int, window_seconds: float) -> float | None:
-        """Record a hit. Returns None if allowed, or the seconds to wait if limited."""
+        """Record a request hit. Returns None if allowed, or remaining seconds to wait if limited."""
         if limit <= 0:
             return None
 
@@ -45,13 +39,7 @@ parse_rate_limiter = SlidingWindowRateLimiter()
 
 
 def client_identifier(request: Request) -> str:
-    """Best-effort client IP.
-
-    Behind a platform proxy the peer address is the proxy, so the first X-Forwarded-For
-    entry is used. That header is client-supplied and therefore spoofable - acceptable here,
-    where the goal is curbing accidental hammering and casual abuse rather than resisting a
-    determined attacker.
-    """
+    """Extract client IP address from proxy headers or connection info."""
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
         first = forwarded.split(",")[0].strip()

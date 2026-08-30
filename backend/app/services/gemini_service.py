@@ -21,12 +21,7 @@ from app.services.pdf_service import RasterizedPage
 
 
 class GeminiProcessingError(RuntimeError):
-    """Base class for Gemini pipeline failures.
-
-    Every subclass carries the HTTP status the API should surface, so an exhausted
-    quota, a rejected key, and a genuinely malformed response are no longer
-    indistinguishable to the caller.
-    """
+    """Base exception for Gemini API processing errors."""
 
     status_code = 502
     default_detail = "The AI extraction service returned an unusable result."
@@ -77,7 +72,7 @@ class GeminiResponseError(GeminiProcessingError):
 
 
 def _classify_api_error(exc: Exception, model: str) -> GeminiProcessingError:
-    """Map a raw SDK/transport failure onto a specific, actionable error type."""
+    """Classify SDK and transport exceptions into typed errors."""
     if isinstance(exc, APIError):
         code = getattr(exc, "code", None)
         status = (getattr(exc, "status", None) or "").upper()
@@ -147,16 +142,7 @@ For EVERY question in the target question list:
 Return only the requested structured result."""
 
 
-# --------------------------------------------------------------------------------------
-# Lenient repair layer
-#
-# Gemini occasionally slips on a single field of a single item (an omitted box, a blank
-# feedback string, a degenerate rectangle). Validating the whole batch strictly turned any
-# such slip into a total loss of a 90-second, multi-call extraction. These helpers normalize
-# the raw payload item-by-item so one bad item costs one item, then the strict Pydantic
-# models still guard the final contract.
-# --------------------------------------------------------------------------------------
-
+# Normalization helpers: clean and sanitize raw model outputs before Pydantic validation
 _MAX_COORD = 1000
 _VALID_STATUSES = {"answered", "unanswered", "out_of_order"}
 
@@ -166,11 +152,7 @@ def _clean_str(value: Any) -> str:
 
 
 def _repair_box(raw: Any) -> dict[str, int] | None:
-    """Clamp a raw box into [0, 1000]. Returns None when it encloses no area.
-
-    Coordinates are clamped rather than invented: a rectangle that is degenerate or
-    inverted after clamping is dropped, never stretched into a fabricated region.
-    """
+    """Clamp raw box coordinates into [0, 1000]. Returns None if degenerate or invalid."""
     if not isinstance(raw, dict):
         return None
     box: dict[str, int] = {}

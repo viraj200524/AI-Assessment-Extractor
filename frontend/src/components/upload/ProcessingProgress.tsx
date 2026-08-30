@@ -5,12 +5,12 @@ import { CheckCircle2, LoaderCircle } from "lucide-react";
 import type { JobStage } from "@/types";
 
 interface ProcessingProgressProps {
-  /** Index of the stage currently running; -1 before the first server update. */
+  /** Index of the stage currently running */
   currentStage: number;
   stages: JobStage[];
-  /** Sub-stage detail from the server, e.g. "Answer sheet page 3 of 4". */
+  /** Sub-stage detail string */
   detail?: string | null;
-  /** Fraction of the pipeline completed, 0..1. */
+  /** Fraction of the pipeline completed (0 to 1) */
   progress?: number;
 }
 

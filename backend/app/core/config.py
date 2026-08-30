@@ -39,12 +39,9 @@ class Settings(BaseSettings):
     supabase_answer_sheets_bucket: str = "answer-sheets"
     max_upload_bytes: int = Field(default=50 * 1024 * 1024, gt=0)
 
-    # Shared demo key for mutating endpoints. Unset (the default) leaves them open, which is
-    # what local development and the test suite rely on. Set it in the deployed environment
-    # to gate the operations that cost Gemini quota or destroy data. It gates cost and
-    # destruction, not identity - reads stay public so the demo can be explored freely.
+    # Optional shared key required for mutating endpoints when configured
     demo_access_key: SecretStr | None = None
-    # Parses per client IP per hour. 0 disables the limit.
+    # Maximum parse requests allowed per client IP per hour (0 disables rate limiting)
     parse_rate_limit_per_hour: int = Field(default=0, ge=0)
 
     @property

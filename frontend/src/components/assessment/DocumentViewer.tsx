@@ -36,7 +36,7 @@ export function DocumentViewer({
   const containerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
-  // Render PDF pages or image document
+  // Render document pages from PDF or direct image
   useEffect(() => {
     let cancelled = false;
 
@@ -109,7 +109,7 @@ export function DocumentViewer({
 
   const activeQuestion = questions.find((question) => question.id === activeQuestionId);
 
-  // Auto-scroll directly to the exact target answer region across any page
+  // Auto-scroll to selected question's answer region
   useEffect(() => {
     const firstRegion = activeQuestion?.answer_regions?.[0];
     if (!firstRegion || !containerRef.current) return;
@@ -120,12 +120,10 @@ export function DocumentViewer({
     if (pageElement) {
       const container = containerRef.current;
       
-      // Calculate precise target Y position relative to the scroll container
       const pageOffsetTop = pageElement.offsetTop;
       const boxYMinRatio = firstRegion.box_2d.ymin / 1000;
       const boxOffsetInPage = pageElement.clientHeight * boxYMinRatio;
       
-      // Position the highlighted answer comfortably in view with generous top padding
       const targetScrollY = Math.max(0, pageOffsetTop + boxOffsetInPage - 160);
 
       container.scrollTo({
@@ -137,7 +135,7 @@ export function DocumentViewer({
     }
   }, [activeQuestionId, activeQuestion]);
 
-  // Track current visible page on manual scroll
+  // Track active page during manual scrolling
   const handleScroll = () => {
     if (!containerRef.current) return;
     const container = containerRef.current;

@@ -12,7 +12,7 @@ class JobStage(BaseModel):
     label: str = Field(description="Human-readable stage label shown in the progress UI")
 
 
-#: The pipeline stages, in execution order. FR-02 names the middle three explicitly.
+#: Pipeline execution stages in sequential order
 PIPELINE_STAGES: list[JobStage] = [
     JobStage(key="uploading", label="Uploading documents"),
     JobStage(key="rasterizing", label="Rasterizing pages"),

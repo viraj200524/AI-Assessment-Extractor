@@ -29,14 +29,13 @@ router = APIRouter()
 
 _SUPPORTED_DOCUMENT_TYPES = {"application/pdf", "image/jpeg", "image/png"}
 
-#: Background workers for job-based parsing. Bounded so concurrent uploads queue rather
-#: than saturating memory with several simultaneous rasterizations.
+# Thread pool for asynchronous background parsing jobs
 _job_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="vedai-parse")
 
 
 @dataclass(frozen=True)
 class PreparedDocument:
-    """An upload staged to disk and ready for the blocking pipeline."""
+    """Document payload staged to a temporary disk path for processing."""
 
     path: Path
     data: bytes
@@ -83,13 +82,7 @@ def run_assessment_pipeline(
     assessment_id: str,
     on_stage: StageCallback = _noop_stage,
 ) -> tuple[AssessmentResponse, bool]:
-    """Rasterize, extract, map/ground/grade, then persist. Returns (response, persisted).
-
-    Fully synchronous and blocking by design: PyMuPDF, the Gemini SDK, and the Supabase
-    client are all blocking. Callers MUST run this off the event loop (a threadpool via
-    ``asyncio.to_thread``, or the job executor) — running it inline would freeze the whole
-    worker for the ~90s the pipeline takes.
-    """
+    """Execute document rasterization, question extraction, answer mapping, and persistence."""
     on_stage("rasterizing", "Rendering question paper")
     question_pages = rasterize_document(
         question_paper.path,
@@ -232,7 +225,7 @@ def _persist_assessment(
 
 
 def _http_error_for(exc: Exception) -> HTTPException:
-    """Map a pipeline failure onto the status code it actually deserves."""
+    """Map pipeline exceptions to appropriate HTTP error status codes."""
     if isinstance(exc, DocumentProcessingError):
         return HTTPException(status_code=422, detail=str(exc))
     if isinstance(exc, GeminiProcessingError):
@@ -251,11 +244,7 @@ async def parse_assessment(
     answer_sheet: UploadFile = File(..., description="Handwritten answer sheet: PDF, PNG, or JPEG."),
     current_settings: Settings = Depends(get_settings),
 ) -> AssessmentResponse:
-    """Run the full pipeline synchronously and return the finished assessment.
-
-    Prefer ``POST /parse/jobs`` in the UI: this endpoint gives no progress signal and can
-    exceed platform request timeouts on longer documents.
-    """
+    """Run the assessment extraction pipeline synchronously."""
     try:
         with TemporaryDirectory(prefix="vedai-parse-") as temporary_directory:
             workspace = Path(temporary_directory)
@@ -264,8 +253,7 @@ async def parse_assessment(
             assessment_id = str(uuid4())
 
             try:
-                # Offloaded so the blocking pipeline never occupies the event loop.
-                # Offloaded so the blocking pipeline never occupies the event loop.
+                # Offload blocking pipeline execution to worker thread
                 response, _ = await asyncio.to_thread(
                     run_assessment_pipeline,
                     prepared_question_paper,
@@ -291,7 +279,7 @@ def _run_parse_job(
     workspace_handle: TemporaryDirectory,
     settings: Settings,
 ) -> None:
-    """Worker body for a background parsing job. Owns the workspace lifetime."""
+    """Worker function for executing a background parsing job."""
     assessment_id = str(uuid4())
     try:
         job_store.set_stage(job_id, "uploading", "Documents received")
@@ -329,12 +317,7 @@ async def create_parse_job(
     answer_sheet: UploadFile = File(..., description="Handwritten answer sheet: PDF, PNG, or JPEG."),
     current_settings: Settings = Depends(get_settings),
 ) -> JobStatus:
-    """Accept both documents and start the pipeline in the background.
-
-    Returns immediately with a job id. Watch progress on ``/parse/jobs/{id}/events`` (SSE)
-    or by polling ``/parse/jobs/{id}``, then collect the assessment from
-    ``/parse/jobs/{id}/result``.
-    """
+    """Create a background parsing job and return its initial status."""
     workspace_handle = TemporaryDirectory(prefix="vedai-job-")
     try:
         workspace = Path(workspace_handle.name)
@@ -362,7 +345,7 @@ async def create_parse_job(
 
 @router.get("/parse/jobs/{job_id}", response_model=JobStatus, tags=["parsing"])
 async def get_parse_job(job_id: str) -> JobStatus:
-    """Poll a parsing job's current stage."""
+    """Poll the status of an ongoing parsing job."""
     job = job_store.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Unknown or expired parsing job.")
@@ -371,7 +354,7 @@ async def get_parse_job(job_id: str) -> JobStatus:
 
 @router.get("/parse/jobs/{job_id}/result", response_model=AssessmentResponse, tags=["parsing"])
 async def get_parse_job_result(job_id: str) -> AssessmentResponse:
-    """Collect the finished assessment once a job has succeeded."""
+    """Retrieve the finished assessment result for a completed parsing job."""
     job = job_store.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Unknown or expired parsing job.")
@@ -388,7 +371,7 @@ def _sse(payload: dict[str, Any], event: str = "status") -> str:
 
 @router.get("/parse/jobs/{job_id}/events", tags=["parsing"])
 async def stream_parse_job(job_id: str, request: Request) -> StreamingResponse:
-    """Stream stage transitions for a parsing job as Server-Sent Events."""
+    """Stream parsing progress updates using Server-Sent Events."""
     if job_store.get(job_id) is None:
         raise HTTPException(status_code=404, detail="Unknown or expired parsing job.")
 
@@ -418,8 +401,7 @@ async def stream_parse_job(job_id: str, request: Request) -> StreamingResponse:
                 idle_seconds += poll_interval
                 if idle_seconds >= keepalive_after:
                     idle_seconds = 0.0
-                    # Comment frame: keeps intermediaries from closing an idle connection
-                    # during the long grounding stage.
+                    # Send periodic keepalive comment frame to maintain connection
                     yield ": keepalive\n\n"
 
             await asyncio.sleep(poll_interval)

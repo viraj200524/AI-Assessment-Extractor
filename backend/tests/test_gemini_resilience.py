@@ -1,8 +1,4 @@
-"""A single imperfect item must cost one item, not the whole extraction (FR-06..FR-13).
-
-Each payload here previously raised GeminiProcessingError and returned 502, discarding a
-complete multi-call extraction because of one malformed field.
-"""
+"""Tests for payload normalization and resilient error handling."""
 
 import json
 from pathlib import Path
@@ -59,7 +55,7 @@ def _run(mapping_payload: dict, tmp_path: Path):
 
 
 def test_answered_without_region_is_kept_not_fatal(tmp_path: Path) -> None:
-    """The answer and its grade survive; only the highlight is unavailable."""
+    """Verify that an answer is preserved even when bounding box regions cannot be localized."""
     result = _run(
         {
             "mapped_answers": [
@@ -108,7 +104,7 @@ def test_blank_feedback_is_backfilled_not_fatal(tmp_path: Path) -> None:
 
 
 def test_degenerate_box_is_dropped_and_siblings_survive(tmp_path: Path) -> None:
-    """A zero-height rectangle is discarded, never stretched into a fabricated region."""
+    """Ensure invalid zero-area bounding boxes are dropped without corrupting valid regions."""
     result = _run(
         {
             "mapped_answers": [
@@ -165,7 +161,7 @@ def test_unmatched_answer_with_blank_reason_is_kept(tmp_path: Path) -> None:
 
 
 def test_every_expected_question_still_gets_an_entry(tmp_path: Path) -> None:
-    """FR-08: questions Gemini never mentioned are backfilled as unanswered."""
+    """Ensure omitted questions are populated with default unanswered status."""
     result = _run({"mapped_answers": [], "unmatched_answers": []}, tmp_path)
     assert {a.question_id for a in result.mapped_answers} == {"q1", "q2"}
     assert all(a.status == "unanswered" and a.score == 0.0 for a in result.mapped_answers)

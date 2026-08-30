@@ -1,9 +1,4 @@
-"""Everything the pipeline produces must survive the database round-trip.
-
-FR-09 (unmatched writing) and the examiner's is_correct verdict were both produced on the
-fresh parse and then lost: unmatched answers were never written, and is_correct was
-re-derived on read as score >= max_marks.
-"""
+"""Tests verifying full data fidelity across Supabase database serialization and retrieval."""
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -26,8 +21,6 @@ QUESTION = QuestionItem(
     max_marks=4.0,
     status="answered",
     transcribed_answer="Force equals mass times acceleration.",
-    # Partial credit the examiner still judged substantially correct: exactly the case the
-    # old score >= max_marks derivation got wrong.
     evaluation=Evaluation(score=3.0, max_marks=4.0, is_correct=True, feedback="Substantially correct."),
     answer_regions=[AnswerRegion(page_number=1, box_2d=BoundingBox(ymin=100, xmin=100, ymax=300, xmax=800))],
 )
@@ -194,6 +187,5 @@ def test_fetch_restores_unmatched_answers_and_stored_is_correct() -> None:
     assert assessment["unmatched_answers"][0]["page_number"] == 2
 
     evaluation = assessment["questions"][0]["evaluation"]
-    # The old read path derived False here (3.0 >= 4.0 is false), overriding the examiner.
     assert evaluation["is_correct"] is True
     assert evaluation["score"] == 3.0

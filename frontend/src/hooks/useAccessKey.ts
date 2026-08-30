@@ -10,16 +10,13 @@ import {
 import { getHealth } from "@/lib/api";
 
 /**
- * Tracks whether this deployment requires a shared access key, and whether the viewer holds
- * one. The key itself never comes from the bundle - it arrives via the `?key=` link or the
- * in-app field and lives only in this browser.
+ * Hook to manage demo access key status and browser storage.
  */
 export function useAccessKey() {
   const [required, setRequired] = useState<boolean | null>(null);
   const [key, setKeyState] = useState<string | null>(null);
 
   useEffect(() => {
-    // Adopt a key from the URL before reading it back, so a fresh link works immediately.
     bootstrapAccessKeyFromUrl();
     setKeyState(readAccessKey());
 

@@ -1,9 +1,4 @@
-"""In-process registry of parsing jobs, so the client can watch pipeline stages live.
-
-Scope note: this store is per-process. It is the right shape for a single uvicorn worker
-(the default deployment here). Running multiple workers or replicas requires moving this
-state to Redis or Postgres, otherwise a poll can land on a worker that never saw the job.
-"""
+"""In-memory registry for tracking asynchronous parsing job states and progress."""
 
 import threading
 import time
